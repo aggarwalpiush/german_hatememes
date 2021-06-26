@@ -7,6 +7,7 @@ from glob import glob
 import os
 from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, roc_curve, auc
 import pandas as pd
+import sys
 
 
 
@@ -31,4 +32,16 @@ def evaluate_model(predict_file_path, gold_file_path):
 
     print('roc_auc_score: %s' %roc_auc)
     print('f1(macro): %s' % f1)
+
+
+def main():
+    pred_file = sys.argv[1]
+    gold_file = sys.argv[2]
+
+    evaluate_model(pred_file, gold_file)
+
+
+if __name__ == '__main__':
+    main()
+
 
