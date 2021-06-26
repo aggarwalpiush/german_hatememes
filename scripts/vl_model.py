@@ -11,6 +11,9 @@ import fasttext
 import torchvision
 import random
 import numpy as np
+import pandas as pd
+from tqdm import tqdm
+
 
 # for the purposes of this post, we'll filter
 # much of the lovely logging info from our LightningModule

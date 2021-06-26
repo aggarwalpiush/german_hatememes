@@ -6,7 +6,6 @@ import tarfile
 import tempfile
 import warnings
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pandas_path  # Path style access for pandas
@@ -22,7 +21,7 @@ data_dir = Path.cwd().parent / "data"
 img_tar_path = data_dir / "img"
 train_path = data_dir / "train.jsonl"
 dev_path = data_dir / "dev_seen.jsonl"
-test_path = data_dir / "test_seen.jsonl"
+test_path = data_dir / "dev_seen_deutsch.jsonl"
 
 
 train_samples_frame = pd.read_json(train_path, lines=True)
@@ -74,8 +73,8 @@ hparams = {
     "dev_limit": None,
     "lr": 0.00005,
     "max_epochs": 10,
-    "n_gpu": 0,
-    "batch_size": 4,
+    "n_gpu": 1,
+    "batch_size": 16,
     # allows us to "simulate" having larger batches
     "accumulate_grad_batches": 16,
     "early_stop_patience": 3
@@ -84,18 +83,17 @@ hparams = {
 
 
 
-hateful_memes_model = HatefulMemesModel(hparams=hparams)
-hateful_memes_model.fit()
+#hateful_memes_model = HatefulMemesModel(hparams=hparams)
+#hateful_memes_model.fit()
 
 checkpoints = list(Path("model-outputs").glob("*.ckpt"))
 assert len(checkpoints) == 1
 
 print(checkpoints)
 
-hateful_memes_model = HatefulMemesModel.load_from_checkpoint(
-    checkpoints[0]
-)
+hateful_memes_model = HatefulMemesModel.load_from_checkpoint('model-outputs/epoch=0.ckpt')
 submission = hateful_memes_model.make_submission_frame(
     test_path
 )
+submission.to_csv(("model-outputs/german_test_baseline.csv"), index=True)
 print(submission.head())
