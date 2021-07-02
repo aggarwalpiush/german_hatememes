@@ -13,7 +13,8 @@ import random
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-
+from bert_serving.client import BertClient
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 # for the purposes of this post, we'll filter
 # much of the lovely logging info from our LightningModule
@@ -51,6 +52,7 @@ class HatefulMemesModel(pl.LightningModule):
         # instantiate transforms, datasets
         self.text_transform = self._build_text_transform()
         self.image_transform = self._build_image_transform()
+        self.bert_transform = self._build_bert_transform()
         self.train_dataset = self._build_dataset("train_path")
         self.dev_dataset = self._build_dataset("dev_path")
         
@@ -153,16 +155,19 @@ class HatefulMemesModel(pl.LightningModule):
                 language_transform = fasttext.train_unsupervised(
                     str(ft_path),
                     model=self.hparams.get("fasttext_model", "cbow"),
-                    dim=self.embedding_dim
+                    dim=self.embedding_dim,
                 )
         return language_transform
+
+    def _build_bert_transform(self):
+        return BertClient()
     
     def _build_image_transform(self):
         image_dim = self.hparams.get("image_dim", 224)
         image_transform = torchvision.transforms.Compose(
             [
                 torchvision.transforms.Resize(
-                    size=(image_dim, image_dim)
+                    size=( image_dim, image_dim)
                 ),        
                 torchvision.transforms.ToTensor(),
                 # all torchvision models expect the same
@@ -182,6 +187,7 @@ class HatefulMemesModel(pl.LightningModule):
             img_dir=self.hparams.get("img_dir"),
             image_transform=self.image_transform,
             text_transform=self.text_transform,
+            bert_transform=self.bert_transform,
             # limit training samples only
             dev_limit=(
                 self.hparams.get("dev_limit", None) 
@@ -203,11 +209,14 @@ class HatefulMemesModel(pl.LightningModule):
         # classification is to overwrite last layer
         # with an identity transformation, we'll reduce
         # dimension using a Linear layer, resnet is 2048 out
-        vision_module = torchvision.models.resnet152(
-            pretrained=True
-        )
+        #vision_module = torchvision.models.resnet152(
+         #   pretrained=True
+        #)
+        vision_module = torchvision.models.wide_resnet101_2(
+                pretrained=True
+                )
         vision_module.fc = torch.nn.Linear(
-                in_features=2048,
+                in_features=vision_module.fc.in_features,
                 out_features=self.vision_feature_dim
         )
 

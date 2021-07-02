@@ -5,9 +5,10 @@
 import codecs
 from glob import glob
 import os
-from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix, roc_curve, auc
+from sklearn.metrics import f1_score, classification_report, roc_auc_score, confusion_matrix, roc_curve, auc
 import pandas as pd
 import sys
+from sklearn.metrics import confusion_matrix
 
 
 
@@ -29,10 +30,12 @@ def evaluate_model(predict_file_path, gold_file_path):
     y_gold = eval_dataset.label_y
     roc_auc = roc_auc_score(y_gold, eval_dataset.proba, average="micro", multi_class="ovr")
     f1 = f1_score(y_gold, y_pred, average="macro")
+    target_names = ['Non-Hate', 'Hate']
 
     print('roc_auc_score: %s' %roc_auc)
     print('f1(macro): %s' % f1)
-
+    print(classification_report(y_gold, y_pred, target_names=target_names))
+    print(confusion_matrix(y_gold, y_pred))
 
 def main():
     pred_file = sys.argv[1]

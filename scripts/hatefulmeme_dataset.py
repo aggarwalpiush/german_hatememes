@@ -3,6 +3,46 @@ import pandas as pd
 import pandas_path
 from pandas_path import path
 from PIL import Image
+import numpy as np
+import os
+from tqdm import tqdm
+from bert_serving.client import BertClient
+bc = BertClient()
+from transformers import AutoTokenizer, pipeline, AutoModelForMaskedLM
+tokenizer = AutoTokenizer.from_pretrained("bert-base-german-cased")
+model = AutoModelForMaskedLM.from_pretrained("bert-base-german-cased")
+pipe = pipeline('feature-extraction', model=model,
+                tokenizer=tokenizer)
+
+
+def get_german_bert_vector(data_path):
+    if os.path.exists(os.path.basename(data_path)+'.german_bert_vec.pkl'):
+        df = pd.read_pickle(os.path.basename(data_path)+'.german_bert_vec.pkl')
+    else:
+        df = pd.DataFrame(columns=['id', 'encode_text'])
+        samples_frame = pd.read_json(
+            data_path, lines=True)
+        i = 0
+        for text in tqdm(samples_frame['text']):
+            df = df.append({'id': samples_frame['id'][i], 'encode_text' :pipe(text, pad_to_max_length=True)[0][0]}, ignore_index=True)
+            i += 1
+        pd.to_pickle(df, os.path.basename(data_path)+'.german_bert_vec.pkl')
+    return df
+
+
+
+def get_bert_vector(data_path):
+    if os.path.exists(os.path.basename(data_path)+'.multi_bert_vec.pkl'):
+        df = pd.read_pickle(os.path.basename(data_path)+'.multi_bert_vec.pkl')
+    else:
+        df = pd.DataFrame(columns=['id', 'encode_text'])
+        samples_frame = pd.read_json(
+            data_path, lines=True)
+        for i, text in enumerate(samples_frame['text']):
+            df = df.append({'id': samples_frame['id'][i], 'encode_text' : bc.encode([text])[0]}, ignore_index=True)
+        pd.to_pickle(df, os.path.basename(data_path)+'.multi_bert_vec.pkl')
+    return df
+
 
 
 class HatefulMemesDataset(torch.utils.data.Dataset):
@@ -16,6 +56,7 @@ class HatefulMemesDataset(torch.utils.data.Dataset):
         img_dir,
         image_transform,
         text_transform,
+        bert_transform, 
         balance=False,
         dev_limit=None,
         random_state=0,
@@ -24,6 +65,8 @@ class HatefulMemesDataset(torch.utils.data.Dataset):
         self.samples_frame = pd.read_json(
             data_path, lines=True
         )
+        #self.encoded_output = get_bert_vector(data_path)
+        self.encoded_output = get_german_bert_vector(data_path)
         self.dev_limit = dev_limit
         if balance:
             neg = self.samples_frame[
@@ -61,6 +104,7 @@ class HatefulMemesDataset(torch.utils.data.Dataset):
             
         self.image_transform = image_transform
         self.text_transform = text_transform
+        self.bert_transform = bert_transform
 
     def __len__(self):
         """This method is called when you do len(instance) 
@@ -74,7 +118,7 @@ class HatefulMemesDataset(torch.utils.data.Dataset):
         """
         if torch.is_tensor(idx):
             idx = idx.tolist()
-
+        text = torch.Tensor(list(self.encoded_output[self.encoded_output['id']==self.samples_frame.loc[idx, "id"]]['encode_text'].values)[0][:768]).squeeze()
         img_id = self.samples_frame.loc[idx, "id"]
 
         image = Image.open(
@@ -82,11 +126,17 @@ class HatefulMemesDataset(torch.utils.data.Dataset):
         ).convert("RGB")
         image = self.image_transform(image)
 
+        '''
         text = torch.Tensor(
             self.text_transform.get_sentence_vector(
                 self.samples_frame.loc[idx, "text"]
             )
         ).squeeze()
+        
+        text = torch.Tensor(
+                bc.encode([self.samples_frame.loc[idx, "text"]])[0]).squeeze()
+        '''
+
 
         if "label" in self.samples_frame.columns:
             label = torch.Tensor(
